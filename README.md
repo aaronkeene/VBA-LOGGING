@@ -47,6 +47,36 @@ The logging library takes a modular approach and offers several categories of co
 
 ## Loggers
 
+Loggers have the following attributes and methods.
+> [!CAUTION]
+> Loggers should NEVER be instantiated directly, but always through the module-level function ```Logging.GetLogger(Name)```. Multiple calls to ```GetLogger()``` with the same name will always return the same Logger object.
+
+
+
+### SetLogLevel(ByVal value As enLogLevel)
+Sets the threshold for logging to this logger instance. Log messages below this threshold will be ignored. Log messages at this trheshold or higher will be processed by LogHandlers.
+
+> [!Note]
+> LogHandlers have their own LogLevel. If the LogHandler severity Level is higher than the Logger's severity level, not log message will be emited.
+
+> [!Note]
+> The root logger is created with level WARNING
+
+### LogCritical(ByVal LogMessage As String)
+Logs a message with level ```LogCritical``` on this logger. The LogMessage is the message formated as a string. When creating a log message, the Logger determines if the LogMessage severity level is greater than the server level set in the Logger.  Log messages below the current LogLevel will be ignored. Log messages at this threshold or higher will be passed to the LogHandlers.
+
+### LogError(ByVal LogMessage As String)
+Logs a message with level ```LogError``` on this logger. Log is processed in the same manner as ```LogCritical()```
+
+### LogWarning(ByVal LogMessage As String)
+Logs a message with level ```LogWarning``` on this logger. Log is processed in the same manner as ```LogCritical()```
+
+### LogInfo(ByVal LogMessage As String)
+Logs a message with level ```LogInfo``` on this logger. Log is processed in the same manner as ```LogCritical()```
+
+### LogDebug(ByVal LogMessage As String)
+Logs a message with level ```LogDebug``` on this logger. Log is processed in the same manner as ```LogCritical()```
+
 ## Handlers
 
 ## Filters
