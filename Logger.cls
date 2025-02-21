@@ -7,161 +7,155 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
-'@Folder("Logging")
+'@Folder("Logger")
 '@PredeclaredId
 
 Option Explicit
-Implements ILogger
 
+Public Enum vbLoggingLevel
+    logNOTSET
+    logTRACE
+    logINFO
+    logSUCCESS
+    logWARNING
+    logERROR
+    logCRITICAL
+End Enum
 
-
-Private Type TLogger
-    Name        As String
-    LogLevel    As enLogLevel
-    Handlers    As New Dictionary
+Private Type ThisClass
+    LogSinks     As Dictionary
+    Formatter    As ILogMessageFormatter
 End Type
 
+Private Self As ThisClass
 
 
-Private self As TLogger
+'''' Class Intialize / Terminate Methods ''''
 
-
-
-Public Function Create(ByVal Name As String, Optional ByVal LogLevel As enLogLevel) As Logger
-    Dim result As New Logger
-        
-    With result
-        .Name = Name
-        .LogLevel = LogLevel
-    End With
+Private Sub Class_Initialize()
+    Set Self.LogSinks = New Dictionary
+    Set Self.Formatter = New DefaultLogMessageFormatter
     
-    Set Create = result
-End Function
-
-
-
-'==============================
-'Properties
-'==============================
-
-
-Friend Property Let Name(ByVal value As String)
-    self.Name = value
-End Property
-
-Friend Property Let LogLevel(ByVal value As enLogLevel)
-    self.LogLevel = value
-End Property
-
-Public Property Let ILogger_SetLogLevel(ByVal value As enLogLevel)
-    LogLevel = value
-End Property
-
-
-
-'==============================
-'Public Methods
-'==============================
-
-
-Public Sub ILogger_AddHandler(handler As ILogHandler)
-    If self.Handlers.Exists(handler.Name) Then
-        Exit Sub
-    End If
-    
-    self.Handlers.Add handler.Name, handler
+    AddLogSink "Console", ConsoleLogSink.Create(vbLoggingLevel.logNOTSET)
 End Sub
 
 
-Public Sub ILogger_LogCritical(ByVal LogMessage As String)
-    If Not ILogger_LogEnabledForLevel(LOG_LEVEL_CRITICAL) Then
-        Exit Sub
-    End If
-    
-    Dim Record As New LogRecord
-    Set Record = Record.Create(self.Name, LOG_LEVEL_CRITICAL, LogMessage)
-    
-    ILogger_HandleRecord Record
+Private Sub Class_Terminate()
+    Set Self.LogSinks = Nothing
 End Sub
 
 
-Public Sub ILogger_LogError(ByVal LogMessage As String)
-    If Not ILogger_LogEnabledForLevel(LOG_LEVEL_ERROR) Then
+''''' Public Methods '''''
+
+Public Sub AddLogSink(ByVal LogName As String, ByVal LogSink As ILogSink)
+    If LogSinkExists(LogName) Then
+        Logger.Warning "Duplicate LogSink [" & LogName & "], LogSink not added."
         Exit Sub
     End If
     
-    Dim Record As New LogRecord
-    Set Record = Record.Create(self.Name, LOG_LEVEL_ERROR, LogMessage)
+    Self.LogSinks.Add LogName, LogSink
     
-    ILogger_HandleRecord Record
-End Sub
-
-
-Public Sub ILogger_LogWarning(ByVal LogMessage As String)
-    If Not ILogger_LogEnabledForLevel(LOG_LEVEL_WARNING) Then
+    If LogName = "Console" Then
         Exit Sub
     End If
     
-    Dim Record As New LogRecord
-    Set Record = Record.Create(self.Name, LOG_LEVEL_WARNING, LogMessage)
-    
-    ILogger_HandleRecord Record
+    Logger.Trace "LogSink [" & LogName & "] added to Logger."
 End Sub
 
 
-Public Sub ILogger_LogInfo(ByVal LogMessage As String)
-    If Not ILogger_LogEnabledForLevel(LOG_LEVEL_INFO) Then
+Public Sub RemoveLogSink(ByVal LogName As String)
+    If Not Self.LogSinks.Exists(LogName) Then
+        Logger.Warning "Attempting to remove LogSink [" & LogName & "] which does not exist."
         Exit Sub
     End If
     
-    Dim Record As New LogRecord
-    Set Record = Record.Create(self.Name, LOG_LEVEL_INFO, LogMessage)
-    
-    ILogger_HandleRecord Record
+    Self.LogSinks.Remove LogName
+    Logger.Trace "LogSink [" & LogName & "] removed from Logger."
 End Sub
 
 
-Public Sub ILogger_LogDebug(ByVal LogMessage As String)
-    If Not ILogger_LogEnabledForLevel(LOG_LEVEL_DEBUG) Then
-        Exit Sub
-    End If
+Public Sub SetGlobalLogLevel(ByVal LogLevel As vbLoggingLevel)
+    Dim key     As Variant
+    Dim Sink    As ILogSink
     
-    Dim Record As New LogRecord
-    Set Record = Record.Create(self.Name, LOG_LEVEL_DEBUG, LogMessage)
-    
-    ILogger_HandleRecord Record
-End Sub
-
-
-
-'==============================
-'Private Methods
-'==============================
-
-Private Function ILogger_LogEnabledForLevel(ByVal LogLevel As enLogLevel) As Boolean
-    If LogLevel >= self.LogLevel Then
-        ILogger_LogEnabledForLevel = True
-        Exit Function
-    End If
-End Function
-
-
-Private Function ILogger_HasHandlers() As Boolean
-    If self.Handlers.Count > 0 Then
-        ILogger_HasHandlers = True
-        Exit Function
-    End If
-End Function
-
-
-Private Sub ILogger_HandleRecord(Record As LogRecord)
-    If Not ILogger_HasHandlers Then: Exit Sub
-    
-    Dim key As Variant
-    Dim handler As ILogHandler
-    
-    For Each key In self.Handlers.Keys
-        Set handler = self.Handlers(key)
-        handler.HandleRecord Record
+    For Each key In Self.LogSinks.Keys
+        Set Sink = Self.LogSinks(key)
+        Sink.SetLoggingLevel LogLevel
     Next
 End Sub
+
+
+Public Sub SetSinkLogLevel(ByVal LogSinkName As String, ByVal LogLevel As vbLoggingLevel)
+    Dim Sink As ILogSink
+    
+    If Not Self.LogSinks.Exists(LogSinkName) Then
+        Exit Sub
+    End If
+    
+    Set Sink = Self.LogSinks(LogSinkName)
+    Sink.SetLoggingLevel LogLevel
+End Sub
+
+
+''''' Public Log Methods '''''
+
+Public Sub Trace(ByVal LogMessage As String, Optional ByVal SourceMethodName As String = vbNullString)
+    ProcessLog vbLoggingLevel.logTRACE, LogMessage, SourceMethodName
+End Sub
+
+
+Public Sub Info(ByVal LogMessage As String, Optional ByVal SourceMethodName As String = vbNullString)
+    ProcessLog vbLoggingLevel.logINFO, LogMessage, SourceMethodName
+End Sub
+
+
+Public Sub Sucess(ByVal LogMessage As String, Optional ByVal SourceMethodName As String = vbNullString)
+    ProcessLog vbLoggingLevel.logSUCCESS, LogMessage, SourceMethodName
+End Sub
+
+
+Public Sub Warning(ByVal LogMessage As String, Optional ByVal SourceMethodName As String = vbNullString)
+    ProcessLog vbLoggingLevel.logWARNING, LogMessage, SourceMethodName
+End Sub
+
+
+Public Sub Error(ByVal LogMessage As String, Optional ByVal SourceMethodName As String = vbNullString)
+    ProcessLog vbLoggingLevel.logERROR, LogMessage, SourceMethodName
+End Sub
+
+
+Public Sub Critical(ByVal LogMessage As String, Optional ByVal SourceMethodName As String = vbNullString)
+    ProcessLog vbLoggingLevel.logCRITICAL, LogMessage, SourceMethodName
+End Sub
+
+
+''''' Private Methods '''''
+
+Private Function LogSinkExists(ByVal LogName As String) As Boolean
+    Dim key As Variant
+
+    For Each key In Self.LogSinks.Keys
+        If key = LogName Then
+            LogSinkExists = True
+            Exit Function
+        End If
+    Next
+End Function
+
+
+Private Sub ProcessLog(ByVal LogLevel As vbLoggingLevel, ByVal LogMessage As String, Optional ByVal SourceMethodName As String = vbNullString)
+    Dim Log As ILogSink
+    Dim key As Variant
+
+    For Each key In Self.LogSinks.Keys
+        Set Log = Self.LogSinks(key)
+        If Log.LoggingLevel <= LogLevel Then
+            Log.Emit FormattedMessage(LogLevel, LogMessage, SourceMethodName)
+        End If
+    Next
+End Sub
+
+
+Private Function FormattedMessage(ByVal LogLevel As vbLoggingLevel, ByVal LogMessage As String, Optional ByVal SourceMethodName As String = vbNullString)
+      FormattedMessage = Self.Formatter.FormatMessage(LogLevel, LogMessage, SourceMethodName)
+End Function
