@@ -7,11 +7,15 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
-'@Folder("Logging")
-
+'@Folder("Logger.LogSink")
 Option Explicit
 
 
+Public Property Get LoggingLevel() As vbLoggingLevel
+End Property
 
-Public Function Format(ByVal Record As ILogRecord) As String
-End Function
+Public Sub Emit(ByVal FormattedMessage As String)
+End Sub
+
+Public Sub SetLoggingLevel(ByVal LoggingLevel As vbLoggingLevel)
+End Sub
